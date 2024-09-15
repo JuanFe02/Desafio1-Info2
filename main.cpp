@@ -23,13 +23,15 @@ unsigned long* tiempoFinal = nullptr;
 int* ciclosCompletos = nullptr;
 char* formaOnda = nullptr;
 
-void inicializarBuffer(int tamano) {
+void inicializarBuffer(int tamano) 
+{
     buffer = new int[tamano];
     tamanoBuffer = new int;
     *tamanoBuffer = tamano;
 }
 
-void liberarMemoria() {
+void liberarMemoria() 
+{
     delete[] buffer;
     delete tamanoBuffer;
     delete tiempoInicio;
@@ -38,12 +40,49 @@ void liberarMemoria() {
     delete[] formaOnda;
 }
 
-void capturarSenal() {
-    for (int i = 0; i < *tamanoBuffer; i++) {
+void capturarSenal() 
+{
+    for (int i = 0; i < *tamanoBuffer; i++) 
+    {
         buffer[i] = analogRead(EntradaAnalogPin);
         delay(10);
     }
 }
 
+void medirFrecuencia(float* frecuencia) 
+{
+    *ciclosCompletos = 0;
+    bool cruzandoPorCero = false;
+    
+    *tiempoInicio = millis();
+    
+    for (int i = 1; i < *tamanoBuffer; i++) 
+    {
+        if (buffer[i] > 512 && buffer[i-1] < 512) 
+        {
+            if (!cruzandoPorCero)
+            {
+                (*ciclosCompletos)++;
+                cruzandoPorCero = true;
+            }
+        } 
+        else if (buffer[i] < 512 && buffer[i-1] > 512) 
+        {
+            if (!cruzandoPorCero) 
+            {
+                (*ciclosCompletos)++;
+                cruzandoPorCero = true;
+            }
+        } 
+        else 
+        {
+            cruzandoPorCero = false;
+        }
+    }
+    
+    *tiempoFinal = millis();
+    float tiempoSegundos = (*tiempoFinal - *tiempoInicio) / 1000.0;
+    *frecuencia = *ciclosCompletos / tiempoSegundos;
+}
 
 

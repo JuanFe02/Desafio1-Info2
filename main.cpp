@@ -22,3 +22,28 @@ unsigned long* tiempoInicio = nullptr;
 unsigned long* tiempoFinal = nullptr;
 int* ciclosCompletos = nullptr;
 char* formaOnda = nullptr;
+
+void inicializarBuffer(int tamano) {
+    buffer = new int[tamano];
+    tamanoBuffer = new int;
+    *tamanoBuffer = tamano;
+}
+
+void liberarMemoria() {
+    delete[] buffer;
+    delete tamanoBuffer;
+    delete tiempoInicio;
+    delete tiempoFinal;
+    delete ciclosCompletos;
+    delete[] formaOnda;
+}
+
+void capturarSenal() {
+    for (int i = 0; i < *tamanoBuffer; i++) {
+        buffer[i] = analogRead(EntradaAnalogPin);
+        delay(10);
+    }
+}
+
+
+

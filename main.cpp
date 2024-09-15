@@ -85,4 +85,92 @@ void medirFrecuencia(float* frecuencia)
     *frecuencia = *ciclosCompletos / tiempoSegundos;
 }
 
+void medirAmplitud(float* amplitud) 
+{
+    int valorMaximo = 0;
+    int valorMinimo = 1023;
+    
+    for (int i = 0; i < *tamanoBuffer; i++) 
+    {
+        if (buffer[i] > valorMaximo) 
+        {
+            valorMaximo = buffer[i];
+        }
+        if (buffer[i] < valorMinimo) 
+        {
+            valorMinimo = buffer[i];
+        }
+    }
+    
+    int amplitudRaw = valorMaximo - valorMinimo;
+    *amplitud = (amplitudRaw * 5.0) / 1023.0;
+}
 
+int detectarCicloCompleto() 
+{
+    int inicioCiclo = -1;
+    for (int i = 1; i < *tamanoBuffer; i++) 
+    {
+        if ((buffer[i - 1] < 512 && buffer[i] >= 512) || (buffer[i - 1] > 512 && buffer[i] <= 512)) 
+        {
+            inicioCiclo = i;
+            break;
+        }
+    }
+    return inicioCiclo;
+}
+
+
+//detectar forma de ondas, faltante
+
+
+void mostrarFormaDeOnda() 
+{
+    lcd.setCursor(0, 1);
+    lcd.print("FdO: ");
+    
+    if (strcmp(formaOnda, "S") == 0) 
+    {
+        lcd.print("S");
+    } 
+    else if (strcmp(formaOnda, "T") == 0) 
+    {
+        lcd.print("T");
+    } 
+    else if (strcmp(formaOnda, "C") == 0) 
+    {
+        lcd.print("C");
+    } 
+    else 
+    {
+        lcd.print("Des");  // Desconocida
+    }
+}
+
+void setup() 
+{
+    Serial.begin(9600);
+    lcd.begin(16, 2);
+    lcd.print("Iniciando...");
+    
+    pinMode(BotonInicioPin, INPUT);
+    pinMode(BotonPararPin, INPUT);
+    
+    tiempoInicio = new unsigned long;
+    tiempoFinal = new unsigned long;
+    ciclosCompletos = new int;
+    formaOnda = new char[20];
+    
+    inicializarBuffer(tamanoInicialBuffer);
+    
+    lcd.setCursor(0, 1);
+    lcd.print("Esperando...");
+    delay(2000);
+}
+
+void loop()
+{
+    int lecturaBotonInicio = digitalRead(BotonInicioPin);
+    int lecturaBotonParar = digitalRead(BotonPararPin);
+
+}

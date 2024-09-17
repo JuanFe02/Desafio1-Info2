@@ -1,6 +1,7 @@
-#include <Adafruit_LiquidCrystal.h> 
+#include <Adafruit_LiquidCrystal.h>  // Librería para pantalla LCD
 
-Adafruit_LiquidCrystal lcd(12, 11, 5, 4, 3, 2); 
+// Definición de constantes y variables globales
+Adafruit_LiquidCrystal lcd(12, 11, 5, 4, 3, 2); // Pines de la LCD
 
 const int BotonInicioPin = 6;   // Botón de inicio
 const int BotonPararPin = 7;    // Botón de pausa
@@ -15,85 +16,163 @@ bool acquiringSignal = false;   // Bandera para saber si estamos adquiriendo se�
 unsigned long UltimoTiempoRebote = 0;  // Tiempo desde la última lectura de pulsadores
 unsigned long DelayRebote = 50;    // Retardo para el debouncing (en milisegundos)
 
-const int tamanoInicialBuffer = 100;  // Tamaño inicial del buffer de almacenamiento
-int* buffer = nullptr;                // Puntero para el buffer dinámico
-int* tamanoBuffer = nullptr;          // Puntero para almacenar el tamaño del buffer dinámico
-char* formaOnda = nullptr;  // Puntero para almacenar el tipo de onda (S, T, C o D)
+const int tamanoInicialBuffer = 200;
+int* buffer = nullptr;
+int* tamanoBuffer = nullptr;
+unsigned long* tiempoInicio = nullptr;
+unsigned long* tiempoFinal = nullptr;
+int* ciclosCompletos = nullptr;
+char* formaOnda = nullptr;
 
+const int umbralCuadrada = 300;
+const int umbralTriangular = 50;
 
-void inicializarBuffer(int tamano) 
-{
-    buffer = new int[tamano];  // Asignar memoria dinámica para el buffer
-    tamanoBuffer = new int;  // Asignar memoria dinámica para el tamaño del buffer
+// Funciones de inicialización y liberación de memoria
+void inicializarBuffer(int tamano) {
+    buffer = new int[tamano];
+    tamanoBuffer = new int;
     *tamanoBuffer = tamano;
 }
 
-void liberarMemoria() 
-{
+void liberarMemoria() {
     delete[] buffer;
     delete tamanoBuffer;
+    delete tiempoInicio;
+    delete tiempoFinal;
+    delete ciclosCompletos;
     delete[] formaOnda;
 }
 
-void capturarSenal() 
-{
-    for (int i = 0; i < *tamanoBuffer; i++) 
-    {
+// Función para capturar la señal
+void capturarSenal() {
+    for (int i = 0; i < *tamanoBuffer; i++) {
         buffer[i] = analogRead(EntradaAnalogPin);
-        delay(10);  
+        Serial.print(buffer[i]);
+        Serial.print(" ");
+        delay(5);
     }
+    Serial.println();
 }
 
-void medirAmplitud(float* amplitud) 
-{
+// Función para medir la frecuencia
+void medirFrecuencia(float* frecuencia) {
+    *ciclosCompletos = 0;
+    bool cruzandoPorCero = false;
+
+    *tiempoInicio = millis();
+
+    for (int i = 1; i < *tamanoBuffer; i++) {
+        if (buffer[i] > 512 && buffer[i-1] < 512) {
+            if (!cruzandoPorCero) {
+                (*ciclosCompletos)++;
+                cruzandoPorCero = true;
+            }
+        } else if (buffer[i] < 512 && buffer[i-1] > 512) {
+            if (!cruzandoPorCero) {
+                (*ciclosCompletos)++;
+                cruzandoPorCero = true;
+            }
+        } else {
+            cruzandoPorCero = false;
+        }
+    }
+
+    *tiempoFinal = millis();
+    float tiempoSegundos = (*tiempoFinal - *tiempoInicio) / 1000.0;
+    if (tiempoSegundos > 0) {
+        *frecuencia = *ciclosCompletos / tiempoSegundos;
+    } else {
+        *frecuencia = 0;
+    }
+
+    Serial.print("Ciclos Completos: ");
+    Serial.println(*ciclosCompletos);
+    Serial.print("Tiempo (s): ");
+    Serial.println(tiempoSegundos);
+}
+
+// Función para medir la amplitud
+void medirAmplitud(float* amplitud) {
     int valorMaximo = 0;
     int valorMinimo = 1023;
 
-    for (int i = 0; i < *tamanoBuffer; i++) 
-    {
-        if (buffer[i] > valorMaximo) 
-        {
+    for (int i = 0; i < *tamanoBuffer; i++) {
+        if (buffer[i] > valorMaximo) {
             valorMaximo = buffer[i];
         }
-        if (buffer[i] < valorMinimo) 
-        {
+        if (buffer[i] < valorMinimo) {
             valorMinimo = buffer[i];
         }
     }
 
-    int amplitudR = valorMaximo - valorMinimo;
-    *amplitud = (amplitudR* 5.0) / 1023.0;
+    int amplitudRaw = valorMaximo - valorMinimo;
+    *amplitud = (amplitudRaw * 5.0) / 1023.0;
+
+    Serial.print("Valor Máximo: ");
+    Serial.println(valorMaximo);
+    Serial.print("Valor Mínimo: ");
+    Serial.println(valorMinimo);
+    Serial.print("Amplitud Raw: ");
+    Serial.println(amplitudRaw);
+    Serial.print("Amplitud (V): ");
+    Serial.println(*amplitud);
 }
 
-// Aqui va la funcion analizar la onda, trabajando en ello
+// Función para identificar la forma de la onda
+void identificarFormaDeOnda() {
+    bool esCuadrada = true;
+    bool esTriangular = true;
+    int cambiosBruscos = 0;
 
+    for (int i = 1; i < *tamanoBuffer; i++) {
+        int diferencia = abs(buffer[i] - buffer[i-1]);
 
+        if (diferencia > umbralCuadrada) {
+            cambiosBruscos++;
+        } else {
+            esCuadrada = false;
+        }
 
+        if (diferencia > umbralTriangular) {
+            esTriangular = false;
+        }
+    }
 
-void mostrarFormaDeOnda() 
-{
+    if (cambiosBruscos > (*tamanoBuffer / 4)) {
+        esCuadrada = true;
+    } else {
+        esCuadrada = false;
+    }
+
+    if (esCuadrada) {
+        strcpy(formaOnda, "C");
+    } else if (esTriangular) {
+        strcpy(formaOnda, "T");
+    } else {
+        strcpy(formaOnda, "S");
+    }
+
+    Serial.print("Forma de Onda: ");
+    Serial.println(formaOnda);
+}
+
+// Función para mostrar la forma de onda cuando la señal está pausada
+void mostrarFormaDeOnda() {
     lcd.setCursor(0, 1);
     lcd.print("FdO: ");
     
-    if (strcmp(formaOnda, "S") == 0) 
-    {
+    if (strcmp(formaOnda, "S") == 0) {
         lcd.print("S");
-    } 
-    else if (strcmp(formaOnda, "T") == 0) 
-    {
+    } else if (strcmp(formaOnda, "T") == 0) {
         lcd.print("T");
-    } 
-    else if (strcmp(formaOnda, "C") == 0)
-    {
+    } else if (strcmp(formaOnda, "C") == 0) {
         lcd.print("C");
-    } 
-    else {
-        lcd.print("D");  // Desconocida
+    } else {
+        lcd.print("Des");
     }
 }
 
-void setup() 
-{
+void setup() {
     Serial.begin(9600);
     lcd.begin(16, 2);
     lcd.print("Iniciando...");
@@ -101,6 +180,9 @@ void setup()
     pinMode(BotonInicioPin, INPUT);
     pinMode(BotonPararPin, INPUT);
 
+    tiempoInicio = new unsigned long;
+    tiempoFinal = new unsigned long;
+    ciclosCompletos = new int;
     formaOnda = new char[20];
 
     inicializarBuffer(tamanoInicialBuffer);
@@ -110,60 +192,57 @@ void setup()
     delay(2000);
 }
 
-void loop() 
-{
+void loop() {
     int lecturaBotonInicio = digitalRead(BotonInicioPin);
     int lecturaBotonParar = digitalRead(BotonPararPin);
 
-    if (lecturaBotonInicio != UltimoEstadoBotonInicio || lecturaBotonParar != UltimoEstadoBotonParar) 
-    {
+    if (lecturaBotonInicio != UltimoEstadoBotonInicio) {
+        UltimoTiempoRebote = millis();
+    }
+    if (lecturaBotonParar != UltimoEstadoBotonParar) {
         UltimoTiempoRebote = millis();
     }
 
-    if ((millis() - UltimoTiempoRebote) > DelayRebote) 
-    {
-        if (lecturaBotonInicio != EstadoBotonInicio) 
-        {
+    if ((millis() - UltimoTiempoRebote) > DelayRebote) {
+        if (lecturaBotonInicio != EstadoBotonInicio) {
             EstadoBotonInicio = lecturaBotonInicio;
-            if (EstadoBotonInicio == HIGH) 
-            {
+            if (EstadoBotonInicio == HIGH) {
                 lcd.clear();
                 lcd.setCursor(0, 0);
-                lcd.print("Obten senal");
+                lcd.print("Adquiriendo senal");
                 acquiringSignal = true;
                 capturarSenal();
             }
         }
 
-        if (lecturaBotonParar != PararBotonEstado) 
-        {
+        if (lecturaBotonParar != PararBotonEstado) {
             PararBotonEstado = lecturaBotonParar;
-            if (PararBotonEstado == HIGH) 
-            {
+            if (PararBotonEstado == HIGH) {
                 lcd.clear();
                 lcd.setCursor(0, 0);
                 lcd.print("Senal en pausa");
                 acquiringSignal = false;
                 identificarFormaDeOnda();
-                mostrarFormaDeOnda();  // Mostrar la forma de onda en pausa
+                mostrarFormaDeOnda();
             }
         }
     }
 
-    if (acquiringSignal) 
-    {
+    if (acquiringSignal) {
+        float frecuencia = 0;
         float amplitud = 0;
 
+        medirFrecuencia(&frecuencia);
         medirAmplitud(&amplitud);
         identificarFormaDeOnda();
 
         lcd.setCursor(0, 0);
-        lcd.print("Analizando senal");
-      	
-      	lcd.setCursor(0, 1);
-        lcd.print("Ampli: ");
+        lcd.print("Frecuencia: ");
+        lcd.print(frecuencia);
+
+        lcd.setCursor(0, 1);
+        lcd.print("Amplitud: ");
         lcd.print(amplitud);
-        lcd.print(" V");
 
         Serial.print("Forma de Onda: ");
         Serial.println(formaOnda);

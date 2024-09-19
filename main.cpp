@@ -237,12 +237,15 @@ void loop() {
         identificarFormaDeOnda();
 
         lcd.setCursor(0, 0);
-        lcd.print("Frecuencia: ");
+        lcd.print("Freq: ");
         lcd.print(frecuencia);
+        lcd.print(" Hz ");
+
 
         lcd.setCursor(0, 1);
-        lcd.print("Amplitud: ");
+        lcd.print("Ampli: ");
         lcd.print(amplitud);
+        lcd.print(" V ");
 
         Serial.print("Forma de Onda: ");
         Serial.println(formaOnda);

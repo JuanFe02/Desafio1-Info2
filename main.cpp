@@ -1,6 +1,5 @@
 #include <Adafruit_LiquidCrystal.h>  // Librería para pantalla LCD
 
-// Definición de constantes y variables globales
 Adafruit_LiquidCrystal lcd(12, 11, 5, 4, 3, 2); // Pines de la LCD
 
 const int BotonInicioPin = 6;   // Botón de inicio
